@@ -14,7 +14,7 @@ Signed-off-by: Aun-Ali Zaidi <admin@kodeit.net>
  1 file changed, 319 insertions(+), 221 deletions(-)
 
 diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
-index c8e5bb12c..a37981495 100644
+index c8e5bb12c..7fb40738d 100644
 --- a/drivers/hwmon/applesmc.c
 +++ b/drivers/hwmon/applesmc.c
 @@ -6,6 +6,7 @@
@@ -965,7 +965,7 @@ index c8e5bb12c..a37981495 100644
  
  out:
  	pr_warn("driver init failed (ret=%d)!\n", ret);
-@@ -1225,49 +1305,60 @@ static int applesmc_create_accelerometer(void)
+@@ -1225,49 +1305,55 @@ static int applesmc_create_accelerometer(void)
  }
  
  /* Release all resources used by the accelerometer */
