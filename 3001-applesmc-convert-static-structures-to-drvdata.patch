@@ -14,7 +14,7 @@ Signed-off-by: Aun-Ali Zaidi <admin@kodeit.net>
  1 file changed, 319 insertions(+), 221 deletions(-)
 
 diff --git a/drivers/hwmon/applesmc.c b/drivers/hwmon/applesmc.c
-index fc6d6a905..7fb40738d 100644
+index c8e5bb12c..a37981495 100644
 --- a/drivers/hwmon/applesmc.c
 +++ b/drivers/hwmon/applesmc.c
 @@ -6,6 +6,7 @@
@@ -451,8 +451,7 @@ index fc6d6a905..7fb40738d 100644
 +	platform_set_drvdata(dev, NULL);
 +	mutex_destroy(&smc->reg.mutex);
 +	kfree(smc);
- 
--	applesmc_device_init();
++
 +	return ret;
 +}
 +
@@ -462,7 +461,8 @@ index fc6d6a905..7fb40738d 100644
 +
 +	applesmc_destroy_modules(smc);
 +	applesmc_destroy_smcreg(smc);
-+
+ 
+-	applesmc_device_init();
 +	mutex_destroy(&smc->reg.mutex);
 +	kfree(smc);
  
@@ -965,7 +965,7 @@ index fc6d6a905..7fb40738d 100644
  
  out:
  	pr_warn("driver init failed (ret=%d)!\n", ret);
-@@ -1225,44 +1305,55 @@ static int applesmc_create_accelerometer(void)
+@@ -1225,49 +1305,60 @@ static int applesmc_create_accelerometer(void)
  }
  
  /* Release all resources used by the accelerometer */
@@ -1004,9 +1004,9 @@ index fc6d6a905..7fb40738d 100644
 -static int applesmc_create_key_backlight(void)
 +static int applesmc_create_key_backlight(struct applesmc_device *smc)
  {
+ 	int ret;
+ 
 -	if (!smcreg.has_key_backlight)
-+	int ret;
-+
 +	if (!smc->reg.has_key_backlight)
  		return 0;
 -	applesmc_led_wq = create_singlethread_workqueue("applesmc-led");
@@ -1014,17 +1014,18 @@ index fc6d6a905..7fb40738d 100644
 +	smc->backlight_wq = create_singlethread_workqueue("applesmc-led");
 +	if (!smc->backlight_wq)
  		return -ENOMEM;
--	return led_classdev_register(&pdev->dev, &applesmc_backlight);
+-	ret = led_classdev_register(&pdev->dev, &applesmc_backlight);
 +
 +	INIT_WORK(&smc->backlight_work, applesmc_backlight_set);
 +	smc->backlight_dev.name = "smc::kbd_backlight";
 +	smc->backlight_dev.default_trigger = "nand-disk";
 +	smc->backlight_dev.brightness_set = applesmc_brightness_set;
 +	ret = led_classdev_register(&smc->dev->dev, &smc->backlight_dev);
-+	if (ret)
+ 	if (ret)
+-		destroy_workqueue(applesmc_led_wq);
 +		destroy_workqueue(smc->backlight_wq);
 +
-+	return ret;
+ 	return ret;
  }
  
 -static void applesmc_release_key_backlight(void)
@@ -1040,7 +1041,7 @@ index fc6d6a905..7fb40738d 100644
  }
  
  static int applesmc_dmi_match(const struct dmi_system_id *id)
-@@ -1306,86 +1397,100 @@ static const struct dmi_system_id applesmc_whitelist[] __initconst = {
+@@ -1311,86 +1397,100 @@ static const struct dmi_system_id applesmc_whitelist[] __initconst = {
  	{ .ident = NULL }
  };
  
@@ -1062,7 +1063,8 @@ index fc6d6a905..7fb40738d 100644
 -	}
 -
 -	ret = platform_driver_register(&applesmc_driver);
--	if (ret)
++	ret = applesmc_create_nodes(smc, info_group, 1);
+ 	if (ret)
 -		goto out_region;
 -
 -	pdev = platform_device_register_simple("applesmc", APPLESMC_DATA_PORT,
@@ -1078,8 +1080,7 @@ index fc6d6a905..7fb40738d 100644
 -		goto out_device;
 -
 -	ret = applesmc_create_nodes(info_group, 1);
-+	ret = applesmc_create_nodes(smc, info_group, 1);
- 	if (ret)
+-	if (ret)
 -		goto out_smcreg;
 +		goto out;
  
@@ -1190,7 +1191,7 @@ index fc6d6a905..7fb40738d 100644
  out_driver:
  	platform_driver_unregister(&applesmc_driver);
  out_region:
-@@ -1397,14 +1502,6 @@ static int __init applesmc_init(void)
+@@ -1402,14 +1502,6 @@ static int __init applesmc_init(void)
  
  static void __exit applesmc_exit(void)
  {
@@ -1205,7 +1206,7 @@ index fc6d6a905..7fb40738d 100644
  	platform_device_unregister(pdev);
  	platform_driver_unregister(&applesmc_driver);
  	release_region(APPLESMC_DATA_PORT, APPLESMC_NR_PORTS);
-@@ -1414,6 +1511,7 @@ module_init(applesmc_init);
+@@ -1419,6 +1511,7 @@ module_init(applesmc_init);
  module_exit(applesmc_exit);
  
  MODULE_AUTHOR("Nicolas Boichat");
@@ -1213,6 +1214,3 @@ index fc6d6a905..7fb40738d 100644
  MODULE_DESCRIPTION("Apple SMC");
  MODULE_LICENSE("GPL v2");
  MODULE_DEVICE_TABLE(dmi, applesmc_whitelist);
--- 
-2.45.2
-
